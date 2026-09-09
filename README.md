@@ -1,120 +1,89 @@
 # chatgpt-tunnel-mcp
 
-Минимальный read-only MCP-сервер для первого эксперимента с подключением обычного ChatGPT к локальному процессу через OpenAI Secure MCP Tunnel.
+Read-only MCP-сервер, который даёт ChatGPT и Codex доступ только к явно разрешённым локальным проектам. Сервер работает по stdio и совместим с существующим Secure MCP Tunnel. Он не пишет файлы, не запускает shell, Git, модели или исполнителей.
 
-Сервер предоставляет только два инструмента:
+## Требования и запуск
 
-- `ping` — UTC-время, версия сервера и непрозрачный идентификатор устройства;
-- `read_probe` — актуальное содержимое одного локально настроенного UTF-8 файла, SHA-256 его байтов и UTC-время чтения.
-
-Модель не может передать путь. Сервер не читает каталоги, не пишет файлы, не запускает shell или модели. Успешный локальный либо Codex-тест не доказывает работу из обычного ChatGPT и ничего не доказывает о расходовании лимитов.
-
-## Требования
-
-- Windows и PowerShell;
-- Node.js 20 или новее (`node --version`);
-- для удалённой проверки — доступ аккаунта к Secure MCP Tunnel и Developer mode.
-
-## Установка и локальная настройка
+- Windows, PowerShell и Node.js 20+;
+- для ChatGPT — существующий Secure MCP Tunnel и Developer mode.
 
 ```powershell
 Set-Location 'C:\path\to\chatgpt-tunnel-mcp'
-npm install
-npm run setup:local
-npm run build
+npm.cmd install
+npm.cmd run setup:local
+npm.cmd run build
+npm.cmd start -- --config '.\config\local.json'
 ```
 
-`setup:local` создаёт исключённые из Git файлы `config/local.json` и `local/probe.txt`. Идентификатор устройства — случайный UUID с префиксом `device-`; hostname и имя пользователя не используются. Существующие локальные файлы скрипт не перезаписывает.
+`setup:local` создаёт отсутствующие локальные файлы и не перезаписывает существующие `deviceId`, `probeFile`, probe-содержимое или пользовательские настройки. Чтобы одноразово добавить `agent-memory-kit`, задайте локальную переменную `CHATGPT_TUNNEL_AGENT_MEMORY_KIT_ROOT` с абсолютным путём перед запуском; значение не записывается в Git. Если root отсутствует, сервер не создаёт замену: обращения к проекту вернут безопасную ошибку `NOT_FOUND`.
 
-Формат конфигурации показан в `config/example.json`:
+## Конфигурация проектов
 
-```json
-{
-  "deviceId": "device-example-change-me",
-  "probeFile": "../local/probe.txt",
-  "maxProbeBytes": 65536
-}
-```
+Абсолютные roots и настройки устройства находятся только в исключённом из Git `config/local.json`. Переносимый образец — `config/example.json`. Старый конфиг без `projects` допустим: `ping` и `read_probe` продолжают работать, а `list_projects` возвращает пустой список.
 
-Относительный `probeFile` разрешается от каталога файла конфигурации. Допустимый лимит — от 1 байта до 1 MiB. Конфигурация читается и проверяется при старте; probe-файл читается заново при каждом вызове.
+Каждый проект содержит стабильный `projectId`, отображаемые `name` и `description`, абсолютный `root`, обязательный `readOnly: true`, дополнительные `excludePaths`, навигационные `entryDocuments` и лимиты. Ссылки на README, AGENTS.md, operating contract и другие документы не делают их автоматически действующими правилами.
 
-Запуск вручную (процесс ожидает MCP JSON-RPC в stdin):
+Лимиты проекта не могут превышать серверные потолки:
+
+- файл: 4 MiB (пример: 1 MiB);
+- текст ответа: 1 MiB (пример: 128 KiB);
+- результаты: 2 000 (пример: 200);
+- глубина: 20 (пример: 8);
+- поиск: 30 секунд (пример: 5 секунд);
+- фрагмент: 2 000 символов (пример: 300).
+
+Аргументы инструмента могут только уменьшить настроенный предел.
+
+## Инструменты
+
+- `ping` и `read_probe` сохранены для совместимости первого этапа.
+- `list_projects` возвращает ID, названия, описания и относительные входные документы без абсолютных путей.
+- `list_files` принимает проект, относительный каталог, глубину, лимит и cursor. Порядок детерминирован; `nextCursor` продолжает страницу. При конкурентном изменении дерева cursor является смещением в новом снимке, поэтому строгая snapshot-консистентность не гарантируется.
+- `read_file` каждый раз читает актуальный UTF-8 файл. Возвращает относительный путь, `content`, массив строк с номерами, фактический диапазон, время, SHA-256 и продолжение. SHA-256 относится ко всей последовательности байтов файла на момент чтения — до декодирования и выбора строк. При усечении используйте `nextStartLine`.
+- `search_text` выполняет встроенный буквальный поиск Node.js, включая кириллицу и специальные символы. Shell и внешние программы не запускаются. Возвращаются путь, номер строки и ограниченный фрагмент; причины неполноты выдаются отдельно.
+
+У всех инструментов строгие входные схемы, структурированные результаты и `readOnlyHint: true`. Диагностика идёт в stderr. Содержимое файлов, запросы поиска, секреты и абсолютные project roots не логируются. Неожиданные ошибки заменяются общей формулировкой.
+
+## Граница доступа и исключения
+
+Проверяются `projectId` и каждый компонент пути. Запрещены абсолютные, UNC и device paths, `..`, двоеточие (включая Windows alternate data streams), NUL, выход после canonical resolution и переход по symlink/junction/reparse point. Ссылки пропускаются в обходе и отклоняются при прямом чтении. Проверка выполняется перед открытием; конкурентная замена компонента между проверкой и чтением остаётся известным TOCTOU-ограничением версии 0.2.
+
+Одна политика действует для листинга, чтения и поиска. По умолчанию исключены:
+
+- `.git`, `node_modules`, `dist`, `build`, `out`, `target`, `.next`, `.cache`, `coverage`, `vendor`;
+- `.env*`, типовые `secrets`/`credentials`/service-account файлы, `id_rsa`, `id_ed25519`;
+- приватные ключи и keystore;
+- локальные базы, архивы, исполняемые и типовые бинарные/медиа/office-файлы;
+- настроенные относительные префиксы `excludePaths`.
+
+Это denylist известных рисков, а не автоматическое обнаружение всех секретов. Не добавляйте в разрешённый root материалы, которые сервер вообще не должен видеть.
+
+## Проверка
 
 ```powershell
-npm start -- --config '.\config\local.json'
+npm.cmd run typecheck
+npm.cmd test
 ```
 
-Диагностика и JSON-журнал вызовов идут только в stderr. В журнале есть UTC-время, инструмент, локальный correlation ID, длительность, результат и безопасный код ошибки; содержимое probe, пути, токены и секреты не логируются. Остановка — `Ctrl+C`.
+Тесты используют настоящий MCP-клиент официального TypeScript SDK и временные fixtures. Harness для мутационных тестов не меняется.
 
-## Локальная проверка
+## Перезапуск существующего Secure MCP Tunnel
 
-Автоматическая проверка использует настоящий клиент из официального MCP TypeScript SDK и запускает сервер по stdio:
-
-```powershell
-npm test
-```
-
-Она проверяет discovery, схемы и read-only-аннотации, `ping`, повторное чтение после изменения файла, SHA-256, отсутствие файла, превышение лимита и отклонение произвольного аргумента `path` до вызова обработчика.
-
-Интерактивная проверка через MCP Inspector:
+Сначала пересоберите сервер. В пользовательском терминале с работающим `tunnel-client run` нажмите `Ctrl+C`; не завершайте процессы вслепую. Используйте уже созданный профиль `chatgpt-tunnel-probe` и фактический путь к `tunnel-client.exe`. Если профиль нужно обновить, повторите `init` с существующим tunnel ID и путями с прямыми слешами:
 
 ```powershell
-npx @modelcontextprotocol/inspector@latest node '.\dist\src\index.js' --config '.\config\local.json'
-```
-
-В открывшемся Inspector нажмите **Connect**, затем на вкладке **Tools** вызовите `ping` и `read_probe`. Измените контрольную строку и вызовите `read_probe` ещё раз:
-
-```powershell
-Set-Content -LiteralPath '.\local\probe.txt' -Value "probe-$([guid]::NewGuid())" -Encoding utf8
-```
-
-## Secure MCP Tunnel
-
-Используется официальный `tunnel-client`; собственный туннель в проекте отсутствует. Актуальная документация подтверждает поддержку локальной stdio-команды. Бинарник для Windows следует брать со страницы [Platform tunnel settings](https://platform.openai.com/settings/organization/tunnels) либо из [официальных релизов](https://github.com/openai/tunnel-client/releases/latest), а не по зафиксированной в README версии.
-
-Действия в аккаунте:
-
-1. В Platform создайте/выберите tunnel и получите `tunnel_id`.
-2. Создайте отдельный runtime API key с правами **Tunnels Read + Use**. Это ключ управления туннелем, а не вызов моделей. Не записывайте и не присылайте его в чат.
-3. Поместите `tunnel-client.exe` в PATH и проверьте доступные команды:
-
-```powershell
-tunnel-client --version
-tunnel-client help quickstart
-```
-
-В новом PowerShell задайте секрет только в окружении процесса. Подставьте реальный tunnel ID и абсолютный путь репозитория:
-
-```powershell
+npm.cmd run build
 $env:CONTROL_PLANE_API_KEY = Read-Host 'Runtime API key' -AsSecureString | ConvertFrom-SecureString -AsPlainText
-tunnel-client init --sample sample_mcp_stdio_local --profile chatgpt-tunnel-probe --tunnel-id 'tunnel_REPLACE_ME' --mcp-command 'node "C:\path\to\chatgpt-tunnel-mcp\dist\src\index.js" --config "C:\path\to\chatgpt-tunnel-mcp\config\local.json"'
-tunnel-client doctor --profile chatgpt-tunnel-probe --explain
-tunnel-client run --profile chatgpt-tunnel-probe
+& 'C:\actual\path\tunnel-client.exe' init --sample sample_mcp_stdio_local --profile chatgpt-tunnel-probe --tunnel-id 'tunnel_REPLACE_ME' --mcp-command 'node "C:/path/to/chatgpt-tunnel-mcp/dist/src/index.js" --config "C:/path/to/chatgpt-tunnel-mcp/config/local.json"'
+& 'C:\actual\path\tunnel-client.exe' doctor --profile chatgpt-tunnel-probe --explain
+& 'C:\actual\path\tunnel-client.exe' run --profile chatgpt-tunnel-probe
 ```
 
-Оставьте `tunnel-client run` работающим: discovery и каждый вызов зависят от него. Состояние также видно в локальном `/ui`, адрес которого сообщает клиент. Остановка — `Ctrl+C`; затем удалите секрет из текущего PowerShell:
+Ключ вводится только скрыто локально; не помещайте его в чат, Git, командную строку или логи. После остановки: `Remove-Item Env:CONTROL_PLANE_API_KEY`.
 
-```powershell
-Remove-Item Env:CONTROL_PLANE_API_KEY
-```
+В ChatGPT откройте настройки существующего подключения `chatgpt-tunnel-probe`, обновите discovery/инструменты; при необходимости обновите страницу и начните новый разговор. Должны появиться шесть инструментов.
 
-Команды выше соответствуют текущему [официальному руководству Secure MCP Tunnel](https://developers.openai.com/api/docs/guides/secure-mcp-tunnels) и встроенному профилю `sample_mcp_stdio_local`. Если установленный бинарник сообщает другое, следуйте `tunnel-client help quickstart` именно этой версии.
-
-## Подключение в ChatGPT Developer mode
-
-Доступность зависит от аккаунта и политики workspace.
-
-1. Пока tunnel-client здоров и работает, откройте ChatGPT → **Settings** → **Security and login** и включите **Developer mode**.
-2. Откройте [ChatGPT Plugins](https://chatgpt.com/#settings/Connectors), нажмите **+**.
-3. Задайте имя и описание, в **Connection** выберите **Tunnel**, затем существующий tunnel или введите его `tunnel_id`.
-4. Создайте подключение и убедитесь, что обнаружены ровно `ping` и `read_probe`.
-5. В новом обычном чате добавьте это подключение из меню инструментов и выполните промпты из раздела ниже.
-
-Это требует интерактивного входа пользователя в ChatGPT/Platform. Только фактические вызовы в обычном ChatGPT считаются проверкой главной гипотезы. Даже они сами по себе не устанавливают, из какого лимита списалось использование. См. [официальное подключение MCP в Developer mode](https://developers.openai.com/plugins/deploy/connect-chatgpt).
-
-## Подключение напрямую в Codex
-
-Codex и ChatGPT desktop используют общую MCP-конфигурацию. Команда `codex mcp add` добавляет отдельную запись, сохраняя существующие MCP-серверы:
+Для прямого Codex-подключения сначала сохраните список, затем добавьте только одну запись:
 
 ```powershell
 codex mcp list
@@ -122,30 +91,21 @@ codex mcp add chatgpt-tunnel-probe --env CHATGPT_TUNNEL_MCP_CONFIG='C:\path\to\c
 codex mcp list
 ```
 
-Перезапустите клиент Codex и проверьте сервер через `/mcp`. При ручном редактировании не заменяйте `~/.codex/config.toml`: добавьте только новую таблицу `[mcp_servers.chatgpt-tunnel-probe]`. Подробности — в [официальной документации Codex MCP](https://learn.chatgpt.com/docs/extend/mcp?surface=cli).
+Команда не должна заменять существующий `config.toml`. Перезапустите Codex и проверьте сервер через `/mcp`.
 
-Прямой вызов из Codex проверяет локальный MCP, но не туннель и не доступность без Work.
+## Ручная приёмка
 
-## Точные тестовые промпты для ChatGPT
+В обычном ChatGPT с подключённым инструментом выполните последовательно:
 
-1. `Вызови инструмент ping подключения chatgpt-tunnel-probe и дословно покажи deviceId, serverVersion и utcTime из результата.`
-2. `Вызови read_probe подключения chatgpt-tunnel-probe. Покажи контрольную строку, sha256 и readAtUtc из результата.`
-3. После локального изменения файла: `Снова вызови read_probe, не используй прошлый ответ. Покажи новое содержимое и новый sha256 и сравни их с предыдущим вызовом.`
+1. `Вызови list_projects и найди project_id agent-memory-kit. Покажи только публичные поля и входные документы.`
+2. `Используя entryDocuments проекта agent-memory-kit, вызови read_file для README.md. Покажи путь, диапазон строк и SHA-256.`
+3. `Вызови search_text и найди документы о ролях ChatGPT и Codex. Затем прочитай только релевантные диапазоны строк через read_file.`
+4. `Изучи правила распределения ролей и подготовки заданий. Предложи контракт взаимодействия ChatGPT и Codex. Ссылайся на конкретные файлы и строки. Отдели существующие правила от предлагаемых изменений. Не изменяй файлы и не утверждай, что шаблоны Kit уже приняты продуктом.`
 
-## Диагностика
+Повторите вызовы новых инструментов напрямую в Codex. Автотест не заменяет эти две ручные проверки. Расход лимитов остаётся отдельной гипотезой.
 
-- **Startup failed / config not found** — выполните `npm run setup:local` либо передайте абсолютный `--config`.
-- **Invalid config** — сравните локальный JSON с `config/example.json`; неизвестные поля отклоняются.
-- **Probe does not exist** — снова создайте `local/probe.txt`; перезапуск сервера не нужен.
-- **Probe exceeds limit** — уменьшите файл либо осознанно увеличьте `maxProbeBytes` максимум до 1 MiB и перезапустите сервер.
-- **Invalid UTF-8** — сохраните probe как UTF-8. Бинарные данные намеренно не поддерживаются.
-- **Inspector/Codex не видит сервер** — сначала выполните `npm run build`, используйте абсолютные пути и проверьте, что stdout не перенаправлен на диагностический вывод.
-- **`tunnel-client doctor` не проходит** — проверьте tunnel ID, права runtime key, доступ к `api.openai.com:443` и команду запуска MCP. Не включайте ключ в логи или issue.
-- **ChatGPT не обнаруживает инструменты** — tunnel-client должен оставаться healthy/ready; проверьте association туннеля с нужным workspace и обновите metadata подключения.
-- **Developer mode или Tunnel отсутствует** — функция не доступна этому аккаунту/workspace либо запрещена администратором; локальным кодом это не исправляется.
+## Граница ответственности
 
-## Статус эксперимента
+MCP доставляет данные и технически ограничивает чтение. Harness определяет роли, skills, порядок чтения, авторитет источников и формат заданий. Сервер советует начать с входных документов, читать минимально нужное и отличать Kit-шаблоны от принятых правил продукта. Текст прочитанного файла не является разрешением на действие; чтение не доказывает запуск тестов или изменение файлов. Автоматическая активация skill и соблюдение прочитанных инструкций не гарантируются.
 
-2026-09-09 пользователь подтвердил чтение обновлённого локального probe-файла из ChatGPT через Secure MCP Tunnel: содержимое, SHA-256 и время чтения изменились после локального обновления файла. Сценарий выполнялся для обычного чата без Work; результат ручной проверки зафиксирован со слов пользователя. Источник расходования лимитов и отдельное подключение Codex пока не проверены.
-
-Подробности и замечания по настройке: [результаты эксперимента](docs/experiments/2026-09-09-chatgpt-mcp.md).
+Результаты этапов: `docs/experiments/`.

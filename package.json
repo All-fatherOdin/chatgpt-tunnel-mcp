@@ -1,9 +1,9 @@
 {
   "name": "chatgpt-tunnel-mcp",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
-  "description": "Minimal read-only MCP probe server for Secure MCP Tunnel experiments",
+  "description": "Read-only local project MCP server for Secure MCP Tunnel experiments",
   "engines": {
     "node": ">=20"
   },

@@ -1,5 +1,24 @@
 {
   "deviceId": "device-example-change-me",
   "probeFile": "../local/probe.txt",
-  "maxProbeBytes": 65536
+  "maxProbeBytes": 65536,
+  "projects": [
+    {
+      "projectId": "example-project",
+      "name": "Example project",
+      "description": "Portable example; replace root only in config/local.json.",
+      "root": "C:/absolute/path/to/project",
+      "readOnly": true,
+      "excludePaths": ["private"],
+      "entryDocuments": [{ "label": "README", "path": "README.md" }],
+      "limits": {
+        "maxFileBytes": 1048576,
+        "maxResponseBytes": 131072,
+        "maxResults": 200,
+        "maxDepth": 8,
+        "searchTimeoutMs": 5000,
+        "maxSnippetChars": 300
+      }
+    }
+  ]
 }
