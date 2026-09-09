@@ -1,0 +1,5 @@
+{
+  "deviceId": "device-example-change-me",
+  "probeFile": "../local/probe.txt",
+  "maxProbeBytes": 65536
+}

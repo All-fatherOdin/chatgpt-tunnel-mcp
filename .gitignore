@@ -1,9 +1,8 @@
 node_modules/
 dist/
-coverage/
+config/local.json
+local/
+*.log
 .env
 .env.*
 !.env.example
-*.log
-.local/
-config.local.*
