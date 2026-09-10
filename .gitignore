@@ -1,4 +1,5 @@
 node_modules/
+Start-MCP-Tunnel.exe
 dist/
 config/local.json
 local/
