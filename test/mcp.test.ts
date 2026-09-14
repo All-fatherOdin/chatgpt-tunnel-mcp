@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { mkdir, mkdtemp, rm, symlink, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { afterEach, test } from "node:test";
@@ -22,6 +22,14 @@ test("legacy config keeps ping and read_probe and exposes an empty project regis
     assert.equal(field(await call(session.client, "read_probe", {}), "text"), "probe marker\n");
     assert.deepEqual(field(await call(session.client, "list_projects", {}), "projects"), []);
   } finally { await session.transport.close(); }
+  const disabled = JSON.parse(await readFile(fixture.config, "utf8")) as Record<string, unknown>;
+  disabled.exchange = { enabled: false };
+  await writeFile(fixture.config, JSON.stringify(disabled), "utf8");
+  const disabledSession = await connect(fixture.config);
+  try {
+    const listed = await disabledSession.client.listTools();
+    assert.deepEqual(listed.tools.map(tool => tool.name).sort(), ["list_files", "list_projects", "ping", "read_file", "read_probe", "search_text"]);
+  } finally { await disabledSession.transport.close(); }
 });
 
 test("projects are isolated; listing is deterministic, bounded and continuable", async () => {

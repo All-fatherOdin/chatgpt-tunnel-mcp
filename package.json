@@ -1,9 +1,9 @@
 {
   "name": "chatgpt-tunnel-mcp",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": true,
   "type": "module",
-  "description": "Read-only local project MCP server for Secure MCP Tunnel experiments",
+  "description": "Local project reading and task/report exchange MCP server for Secure MCP Tunnel experiments",
   "engines": {
     "node": ">=20"
   },
@@ -16,10 +16,15 @@
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "1.30.0",
+    "better-sqlite3": "12.2.0",
     "zod": "^3.25.76"
   },
   "devDependencies": {
+    "@types/better-sqlite3": "^7.6.13",
     "@types/node": "^24.3.1",
     "typescript": "^5.9.2"
+  },
+  "allowScripts": {
+    "better-sqlite3@12.2.0": true
   }
 }

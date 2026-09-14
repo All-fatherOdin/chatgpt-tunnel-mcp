@@ -5,9 +5,11 @@ import type { AppConfig } from "./config.js";
 import { logToolCall } from "./logger.js";
 import { ProbeError, readProbe } from "./probe.js";
 import { ProjectError, listFiles, publicProjects, readProjectFile, searchProjectText } from "./projects.js";
+import { registerExchangeTools } from "./exchange/tools.js";
+import { ExchangeError } from "./exchange/store.js";
 
 export const SERVER_NAME = "chatgpt-tunnel-mcp";
-export const SERVER_VERSION = "0.2.0";
+export const SERVER_VERSION = "0.3.0";
 const annotations = { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false } as const;
 const emptyInput = z.object({}).strict();
 const projectId = z.string().min(1).max(100);
@@ -31,6 +33,7 @@ export function createServer(config: AppConfig): McpServer {
     title: "Search literal text in an allowed project", description: "Search current allowed UTF-8 files for a literal string without shell interpretation. Reports result, time, and skipped-file limits.", annotations, outputSchema: anyOutput,
     inputSchema: z.object({ projectId, query: z.string().min(1).max(1_000), path: relativePath.optional().default(""), limit: z.number().int().positive().max(2_000).optional(), snippetChars: z.number().int().positive().max(2_000).optional() }).strict()
   }, async input => instrument("search_text", () => searchProjectText(config, input)));
+  registerExchangeTools(server, config, instrument);
   return server;
 }
 
@@ -41,10 +44,13 @@ async function instrument<T extends Record<string, unknown>>(tool: string, opera
     logToolCall({ tool, correlationId, durationMs: roundedDuration(started), outcome: "success" });
     return { content: [{ type: "text" as const, text: JSON.stringify(structuredContent) }], structuredContent };
   } catch (error) {
-    const safe = error instanceof ProbeError || error instanceof ProjectError;
+    const safe = error instanceof ProbeError || error instanceof ProjectError || error instanceof ExchangeError;
     const errorCode = safe ? error.code : "UNEXPECTED";
     logToolCall({ tool, correlationId, durationMs: roundedDuration(started), outcome: "error", errorCode });
-    return { content: [{ type: "text" as const, text: safe ? error.message : "Tool failed unexpectedly." }], isError: true as const };
+    const text = error instanceof ExchangeError
+      ? JSON.stringify({ code: error.code, message: error.message, correlationId, retryable: error.retryable })
+      : safe ? error.message : "Tool failed unexpectedly.";
+    return { content: [{ type: "text" as const, text }], isError: true as const };
   }
 }
 function roundedDuration(started: number) { return Math.round((performance.now() - started) * 100) / 100; }

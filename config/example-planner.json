@@ -1,0 +1,34 @@
+{
+  "deviceId": "device-planner-example",
+  "probeFile": "../local/probe.txt",
+  "maxProbeBytes": 65536,
+  "projects": [
+    {
+      "projectId": "example-project",
+      "name": "Example project",
+      "description": "Replace root only in a local, ignored copy.",
+      "root": "C:/absolute/path/to/project",
+      "readOnly": true,
+      "excludePaths": ["private"],
+      "entryDocuments": [{ "label": "README", "path": "README.md" }]
+    }
+  ],
+  "exchange": {
+    "enabled": true,
+    "storePath": "C:/Users/YOU/AppData/Local/chatgpt-tunnel-mcp/exchange.sqlite",
+    "principalId": "planner-main",
+    "role": "planner",
+    "allowedProjectIds": ["example-project"],
+    "limits": {
+      "maxTaskBytes": 32768,
+      "maxReportBytes": 65536,
+      "maxReviewBytes": 8192,
+      "maxResponseBytes": 131072,
+      "defaultListLimit": 20,
+      "maxListLimit": 100,
+      "maxTasks": 10000,
+      "maxHistoryBytes": 268435456,
+      "busyTimeoutMs": 5000
+    }
+  }
+}

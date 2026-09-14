@@ -1,0 +1,23 @@
+{
+  "deviceId": "device-worker-example",
+  "probeFile": "../local/probe.txt",
+  "maxProbeBytes": 65536,
+  "projects": [
+    {
+      "projectId": "example-project",
+      "name": "Example project",
+      "description": "Use the same projectId and root as the planner profile.",
+      "root": "C:/absolute/path/to/project",
+      "readOnly": true,
+      "excludePaths": ["private"],
+      "entryDocuments": [{ "label": "README", "path": "README.md" }]
+    }
+  ],
+  "exchange": {
+    "enabled": true,
+    "storePath": "C:/Users/YOU/AppData/Local/chatgpt-tunnel-mcp/exchange.sqlite",
+    "principalId": "worker-main",
+    "role": "worker",
+    "allowedProjectIds": ["example-project"]
+  }
+}

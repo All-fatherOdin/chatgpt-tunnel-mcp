@@ -16,12 +16,16 @@ internal static class TunnelLauncher
             {
                 if (arg == "--reset-key") option += " -ResetKey";
                 else if (arg == "--check") option += " -CheckOnly";
-                else throw new ArgumentException("Supported options: --reset-key, --check");
+                else if (arg == "--status") option += " -Status";
+                else if (arg == "--stop") option += " -Stop";
+                else throw new ArgumentException("Supported options: --reset-key, --check, --status, --stop");
             }
             string shell = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), "WindowsPowerShell", "v1.0", "powershell.exe");
             var start = new ProcessStartInfo(shell, "-NoProfile -ExecutionPolicy Bypass -File \"" + script + "\"" + option);
             start.UseShellExecute = false;
             start.WorkingDirectory = root;
+            // Do not inherit PowerShell 7 module paths into Windows PowerShell 5.1.
+            start.EnvironmentVariables["PSModulePath"] = Path.Combine(Path.GetDirectoryName(shell), "Modules") + ";" + Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "WindowsPowerShell", "Modules");
             using (var process = Process.Start(start))
             {
                 process.WaitForExit();
