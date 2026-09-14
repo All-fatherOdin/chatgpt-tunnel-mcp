@@ -1,5 +1,7 @@
 # chatgpt-tunnel-mcp
 
+Переиспользуемые роли, скиллы Codex и генерация инструкций ChatGPT: [workflow 1.0.0](docs/reusable-workflow.md). [Подробный план реализации](docs/workflow-implementation-plan.md).
+
 Реализация 0.3.0: [этап 3 — двусторонний обмен заданиями и отчётами](docs/stage-3-task-report-exchange.md). Функциональная ручная приёмка пройдена 2026-09-14: [результаты и ограничения](docs/experiments/2026-09-14-stage-3-manual-acceptance.md).
 
 Независимый от Codex фоновый запуск на Windows двойным щелчком, с сохранением ключа через DPAPI: [инструкция лаунчера](docs/windows-launcher.md).

@@ -1,0 +1,6 @@
+{
+  "version": "1.0.0",
+  "serverCompatibility": "0.3.x",
+  "schemaVersion": 1,
+  "skills": ["mcp-task-planning", "mcp-task-execution", "mcp-report-review"]
+}

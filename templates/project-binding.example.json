@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 1,
+  "projectId": "example-product",
+  "workingDirectory": "C:/path/to/product",
+  "plannerConnection": "planner-connection-name",
+  "workerConnection": "worker-connection-name",
+  "entryDocuments": ["AGENTS.md", "README.md"],
+  "secondaryProjects": [
+    { "projectId": "example-memory", "entryDocuments": ["README.md"] }
+  ],
+  "productRules": "Read current product instructions for branch, checks, scope and memory-write rules."
+}

@@ -1,0 +1,70 @@
+{
+  "create_task": {
+    "projectId": "example-product",
+    "idempotencyKey": "10000000-0000-4000-8000-000000000001",
+    "title": "Document an existing behavior",
+    "objective": "Inspect the approved scope and report what is verified.",
+    "scope": {
+      "allowedPaths": [
+        "README.md"
+      ],
+      "outOfScope": [
+        "External mutations"
+      ]
+    },
+    "constraints": [
+      "Read-only inspection; no file changes."
+    ],
+    "acceptanceCriteria": [
+      {
+        "id": "AC1",
+        "description": "The report distinguishes verified behavior from missing evidence."
+      }
+    ],
+    "sourceRefs": []
+  },
+  "claim_task": {
+    "projectId": "example-product",
+    "taskId": "00000000-0000-4000-8000-000000000001",
+    "expectedRevision": 1,
+    "idempotencyKey": "10000000-0000-4000-8000-000000000002"
+  },
+  "submit_report": {
+    "projectId": "example-product",
+    "taskId": "00000000-0000-4000-8000-000000000001",
+    "expectedRevision": 2,
+    "idempotencyKey": "10000000-0000-4000-8000-000000000003",
+    "outcome": "blocked",
+    "summary": "Required evidence is unavailable.",
+    "changes": [],
+    "checks": [
+      {
+        "description": "Required source access",
+        "status": "not_run",
+        "evidence": "No approved source was supplied."
+      }
+    ],
+    "criterionResults": [
+      {
+        "criterionId": "AC1",
+        "status": "not_verified",
+        "evidence": "Needs the missing source."
+      }
+    ],
+    "limitations": [
+      "Missing approved evidence source."
+    ],
+    "questions": [
+      "Provide the approved source."
+    ]
+  },
+  "review_report": {
+    "projectId": "example-product",
+    "taskId": "00000000-0000-4000-8000-000000000001",
+    "reportId": "00000000-0000-4000-8000-000000000002",
+    "expectedRevision": 3,
+    "idempotencyKey": "10000000-0000-4000-8000-000000000004",
+    "decision": "changes_requested",
+    "comment": "Provide the missing evidence in a linked follow-up."
+  }
+}

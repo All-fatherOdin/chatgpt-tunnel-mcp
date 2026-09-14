@@ -1,0 +1,6 @@
+interface:
+  display_name: "MCP Task Planning"
+  short_description: "Prepare and publish scoped MCP exchange tasks"
+  default_prompt: "Use $mcp-task-planning for the MCP task in this request."
+policy:
+  allow_implicit_invocation: true
