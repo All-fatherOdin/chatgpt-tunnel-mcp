@@ -1,0 +1,19 @@
+{
+  "enabled": false,
+  "workerConfig": "worker.local.json",
+  "statePath": "C:/Users/YOU/AppData/Local/chatgpt-tunnel-mcp/dispatcher.sqlite",
+  "codexCommand": "C:/absolute/path/to/codex.exe",
+  "pollIntervalMs": 5000,
+  "turnTimeoutMs": 1800000,
+  "executor": { "model": "gpt-5.6-sol", "reasoningEffort": "medium" },
+  "projects": [{
+    "projectId": "example-project",
+    "enabled": false,
+    "allowedPlannerIds": ["planner-main"],
+    "allowWholeProject": false,
+    "allowedPaths": ["docs"],
+    "executor": {},
+    "maxSessionTasks": 5,
+    "sandbox": "workspace-write"
+  }]
+}

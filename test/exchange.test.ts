@@ -71,9 +71,12 @@ test("planner and worker expose role-specific tools and complete a persistent id
     }
 
     const secretToken = "SECRET-LIKE-CONTROL-TEXT-9f8e7d";
-    const createInput = taskInput({ title: secretToken });
+    const createInput = taskInput({ title: secretToken, execution: { autoStart: true, model: "test-model", reasoningEffort: "medium", session: { mode: "new" } } });
     const created = await call(planner.client, "create_task", createInput);
     const taskId = stringField(created, "taskId");
+    const queued = await call(planner.client, "get_task", { projectId: "project", taskId });
+    assert.deepEqual((queued.task as Record<string, unknown>).execution, createInput.execution);
+    assert.equal((queued.task as Record<string, unknown>).state, "queued", "MCP publication must not itself execute even an opted-in task");
     assert.equal(planner.stderrText().includes(secretToken), false);
     assert.equal(planner.stderrText().includes(fixture.projectRoot), false);
     assert.equal(planner.stderrText().includes(fixture.storePath), false);

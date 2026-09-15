@@ -21,7 +21,7 @@ export function registerExchangeTools(server: McpServer, config: AppConfig, run:
     title: "List exchange tasks", description: "List current task cards for an allowed project using a filter-bound keyset cursor.", inputSchema: deferredValidation(listTasksInputSchema), outputSchema: listTasksOutputSchema, annotations: readAnnotations
   }, input => run("list_tasks", () => service.listTasks(validated(listTasksInputSchema, input))) as never);
   server.registerTool("get_task", {
-    title: "Get exchange task", description: "Read one immutable task and its current lifecycle metadata, report ID, and review when present.", inputSchema: deferredValidation(getTaskInputSchema), outputSchema: getTaskOutputSchema, annotations: readAnnotations
+    title: "Get exchange task", description: "Read one task, lifecycle, report ID and review. When dispatcherStatePath is locally configured, executionStatus exposes launch progress, model, session and attention code without starting work.", inputSchema: deferredValidation(getTaskInputSchema), outputSchema: getTaskOutputSchema, annotations: readAnnotations
   }, input => run("get_task", () => { const value = validated(getTaskInputSchema, input); return service.getTask(value.projectId, value.taskId); }) as never);
   server.registerTool("get_report", {
     title: "Get exchange report", description: "Read one immutable worker report from an allowed project.", inputSchema: deferredValidation(getReportInputSchema), outputSchema: getReportOutputSchema, annotations: readAnnotations
@@ -29,7 +29,7 @@ export function registerExchangeTools(server: McpServer, config: AppConfig, run:
 
   if (config.exchange.role === "planner") {
     server.registerTool("create_task", {
-      title: "Create exchange task", description: "Publish a structured task with byte space reserved for its complete lifecycle. Does not execute it or modify project files.", inputSchema: deferredValidation(createTaskInputSchema), outputSchema: createTaskOutputSchema, annotations: mutationAnnotations
+      title: "Create exchange task", description: "Publish a structured task. execution.autoStart=true explicitly authorizes a separately configured local dispatcher to execute its scope; optional model/reasoningEffort/session override launch defaults. Without opt-in it stays manual. This MCP server never launches processes or modifies project files.", inputSchema: deferredValidation(createTaskInputSchema), outputSchema: createTaskOutputSchema, annotations: mutationAnnotations
     }, input => run("create_task", () => service.createTask(validated(createTaskInputSchema, input))) as never);
     server.registerTool("review_report", {
       title: "Review exchange report", description: "Record acceptance or a request for changes on the exact report. Does not merge, publish, or create a follow-up automatically.", inputSchema: deferredValidation(reviewReportInputSchema), outputSchema: reviewReportOutputSchema, annotations: mutationAnnotations

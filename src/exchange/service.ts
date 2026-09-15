@@ -4,6 +4,7 @@ import { ProjectError, readProjectFile } from "../projects.js";
 import type { CancelTaskInput, ClaimTaskInput, CreateTaskInput, ListTasksInput, Report, Review, ReviewReportInput, SubmitReportInput, Task } from "./schemas.js";
 import { ExchangeError, ExchangeStore } from "./store.js";
 import { MAX_CANCEL_REASON_JSON_BYTES, cancelReasonJsonBytes, jsonBytes, taskLifecycleBytes } from "./limits.js";
+import { readExecutionStatus } from "./execution-status.js";
 
 export class ExchangeService {
   private readonly exchange: ExchangeConfig;
@@ -13,6 +14,8 @@ export class ExchangeService {
     this.exchange = appConfig.exchange;
     this.store = new ExchangeStore(this.exchange);
   }
+
+  close(): void { this.store.close(); }
 
   async createTask(input: CreateTaskInput) {
     this.authorize(input.projectId, "planner");
@@ -32,7 +35,8 @@ export class ExchangeService {
     const task: Task = {
       schemaVersion: 1, taskId: randomUUID(), projectId: input.projectId, createdAt: new Date().toISOString(), createdBy: this.exchange.principalId,
       revision: 1, state: "queued", ...(input.parentTaskId ? { parentTaskId: input.parentTaskId } : {}), title: input.title, objective: input.objective,
-      scope: input.scope, constraints: input.constraints, acceptanceCriteria: input.acceptanceCriteria, sourceRefs: input.sourceRefs
+      scope: input.scope, constraints: input.constraints, acceptanceCriteria: input.acceptanceCriteria, sourceRefs: input.sourceRefs,
+      ...(input.execution ? { execution: input.execution } : {})
     };
     if (taskLifecycleBytes(task) > this.exchange.limits.maxTaskBytes) throw new ExchangeError("LIMIT_EXCEEDED", "Task leaves insufficient space for its lifecycle metadata.");
     assertResponseBytes({ task }, this.exchange.limits.maxResponseBytes);
@@ -46,7 +50,9 @@ export class ExchangeService {
 
   getTask(projectId: string, taskId: string) {
     this.authorize(projectId);
-    const result = this.store.getTask(projectId, taskId);
+    const base = this.store.getTask(projectId, taskId);
+    const executionStatus = readExecutionStatus(this.exchange.dispatcherStatePath, this.exchange.storePath, projectId, taskId);
+    const result = { ...base, ...(executionStatus ? { executionStatus } : {}) };
     assertResponseBytes(result, this.exchange.limits.maxResponseBytes);
     return result;
   }
@@ -79,7 +85,8 @@ export class ExchangeService {
     if (JSON.stringify([...actualIds].sort()) !== JSON.stringify(expectedIds)) throw new ExchangeError("INVALID_INPUT", "Criterion results must cover every task criterion exactly once.");
     const report: Report = {
       schemaVersion: 1, reportId: randomUUID(), taskId: input.taskId, projectId: input.projectId, createdAt: new Date().toISOString(), createdBy: this.exchange.principalId,
-      outcome: input.outcome, summary: input.summary, changes: input.changes, checks: input.checks, criterionResults: input.criterionResults, limitations: input.limitations, questions: input.questions
+      outcome: input.outcome, summary: input.summary, changes: input.changes, checks: input.checks, criterionResults: input.criterionResults, limitations: input.limitations, questions: input.questions,
+      ...(input.execution ? { execution: input.execution } : {})
     };
     assertBytes(report, this.exchange.limits.maxReportBytes, "Report");
     assertResponseBytes({ report }, this.exchange.limits.maxResponseBytes);

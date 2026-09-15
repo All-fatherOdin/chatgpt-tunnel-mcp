@@ -39,6 +39,7 @@ const disabledExchangeSchema = z.object({ enabled: z.literal(false) }).strict();
 const enabledExchangeSchema = z.object({
   enabled: z.literal(true),
   storePath: z.string().min(1),
+  dispatcherStatePath: z.string().min(1).optional(),
   principalId: z.string().min(1).max(128).regex(/^[A-Za-z0-9][A-Za-z0-9._-]*$/),
   role: z.enum(["planner", "worker"]),
   allowedProjectIds: z.array(z.string().min(1).max(100)).min(1).max(50),
@@ -91,6 +92,13 @@ export async function loadConfig(configPath: string): Promise<AppConfig> {
     await prepareStoreDirectory(storePath);
     await assertCanonicalSeparation(storePath, projects);
     exchange = { ...result.data.exchange, storePath };
+    if (exchange.dispatcherStatePath) {
+      const path = exchange.dispatcherStatePath;
+      if (!isAbsolute(path) || isNetworkPath(path) || hasTraversal(path) || pathsOverlap(path, storePath) || projects.some(project => pathsOverlap(path, project.root))) throw new Error("Invalid config: dispatcherStatePath must be separate absolute local storage outside project roots");
+      exchange.dispatcherStatePath = resolve(path);
+      await prepareStoreDirectory(exchange.dispatcherStatePath);
+      await assertCanonicalSeparation(exchange.dispatcherStatePath, projects);
+    }
   }
   return {
     deviceId: result.data.deviceId,
@@ -115,7 +123,7 @@ function isNetworkPath(value: string): boolean {
 
 function hasTraversal(value: string): boolean { return value.replaceAll("\\", "/").split("/").includes(".."); }
 
-function pathsOverlap(left: string, right: string): boolean {
+export function pathsOverlap(left: string, right: string): boolean {
   const normalize = (value: string) => process.platform === "win32" ? resolve(value).toLowerCase() : resolve(value);
   const a = normalize(left), b = normalize(right);
   const ab = relative(a, b), ba = relative(b, a);
@@ -123,7 +131,7 @@ function pathsOverlap(left: string, right: string): boolean {
   return inside(ab) || inside(ba);
 }
 
-async function prepareStoreDirectory(storePath: string): Promise<void> {
+export async function prepareStoreDirectory(storePath: string): Promise<void> {
   const directory = dirname(storePath);
   try {
     await assertNoLinks(directory);
@@ -141,7 +149,7 @@ async function prepareStoreDirectory(storePath: string): Promise<void> {
   }
 }
 
-async function assertNoLinks(targetDirectory: string): Promise<void> {
+export async function assertNoLinks(targetDirectory: string): Promise<void> {
   const root = parse(targetDirectory).root;
   const parts = relative(root, targetDirectory).split(sep).filter(Boolean);
   let cursor = root;
@@ -156,7 +164,7 @@ async function assertNoLinks(targetDirectory: string): Promise<void> {
   }
 }
 
-async function assertCanonicalSeparation(storePath: string, projects: ProjectConfig[]): Promise<void> {
+export async function assertCanonicalSeparation(storePath: string, projects: ProjectConfig[]): Promise<void> {
   try {
     const storeReal = resolve(await realpath(dirname(storePath)), basename(storePath));
     for (const project of projects) {

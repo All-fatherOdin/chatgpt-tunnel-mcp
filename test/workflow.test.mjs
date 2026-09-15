@@ -77,5 +77,5 @@ test('workflow example requests remain valid against actual MCP schemas', async 
   const requests = JSON.parse(await readFile(join(repository, 'templates/exchange-requests.example.json'), 'utf8'));
   for (const [name, schema] of Object.entries({ create_task: createTaskInputSchema, claim_task: claimTaskInputSchema, submit_report: submitReportInputSchema, review_report: reviewReportInputSchema })) schema.parse(requests[name]);
   const pkg = JSON.parse(await readFile(join(repository, 'package.json'), 'utf8'));
-  assert.match(pkg.version, /^0\.3\./);
+  assert.match(pkg.version, /^0\.[34]\./);
 });
