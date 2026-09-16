@@ -1,9 +1,9 @@
 {
   "name": "chatgpt-tunnel-mcp",
-  "version": "0.4.0",
+  "version": "1.0.0",
   "private": true,
   "type": "module",
-  "description": "Local project reading and task/report exchange MCP server for Secure MCP Tunnel experiments",
+  "description": "Local MCP bridge for project reading and automated ChatGPT-to-Codex task exchange",
   "engines": {
     "node": ">=20"
   },

@@ -5,7 +5,7 @@ description: Review a task-exchange MCP report against its task and evidence, re
 
 # Проверка отчёта
 
-Совместимость: chatgpt-tunnel-mcp 0.3.x, schemaVersion 1; workflow 1.0.0.
+Совместимость: chatgpt-tunnel-mcp 1.0.x, schemaVersion 1; workflow 1.0.0.
 
 Найди get_task/get_report/review_report нужного planner-подключения независимо от приложения. Используй projectId и reportId/taskId из поручения; проверь их связь. Решение может записать только principal создателя задания. Если ты исполнял это задание, не принимай собственный отчёт через второе подключение: передай независимому планировщику.
 
@@ -17,6 +17,6 @@ description: Review a task-exchange MCP report against its task and evidence, re
 
 Перед новой мутацией прочитай актуальную revision; используй новый UUID. Сохрани точные аргументы и ответ. После timeout сначала get_task, затем при необходимости точный повтор с прежним UUID и исходной revision. Не меняй ключ ради обхода IDEMPOTENCY_CONFLICT и не меняй SQLite. При NOT_FOUND проверь projectId/подключение; при FORBIDDEN не подменяй principal.
 
-Если Review уже существует, не записывай другое решение поверх него. В 0.3.x один Report и один Review на Task; changes_requested → queued отсутствует. По поручению доработать создай follow-up через create_task (или примени mcp-task-planning, если доступен): parentTaskId исходной задачи, новый UUID, актуальные sourceRefs того же проекта, только оставшийся объём и полный набор необходимых критериев. Само решение changes_requested не разрешает автоматически создавать или запускать новую работу. Проверяй наличие ранее созданного follow-up перед неоднозначным повтором.
+Если Review уже существует, не записывай другое решение поверх него. В API 1.0.x один Report и один Review на Task; changes_requested → queued отсутствует. По поручению доработать создай follow-up через create_task (или примени mcp-task-planning, если доступен): parentTaskId исходной задачи, новый UUID, актуальные sourceRefs того же проекта, только оставшийся объём и полный набор необходимых критериев. Само решение changes_requested не разрешает автоматически создавать или запускать новую работу. Проверяй наличие ранее созданного follow-up перед неоднозначным повтором.
 
 Итог: решение или рекомендация, taskId/reportId/reviewId, доказанные факты, evidence исполнителя, ограничения и при наличии новый taskId. Принятие follow-up закрывает замечание в цепочке; исходное changes_requested остаётся историческим. Accepted не означает merge/deploy.

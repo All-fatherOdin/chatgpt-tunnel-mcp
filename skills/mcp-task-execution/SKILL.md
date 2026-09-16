@@ -5,7 +5,7 @@ description: Execute an existing task-exchange MCP task by projectId and taskId 
 
 # Выполнение MCP-задания
 
-Совместимость: chatgpt-tunnel-mcp 0.3.x, schemaVersion 1; workflow 1.0.0. Получай актуальные схемы из инструментов.
+Совместимость: chatgpt-tunnel-mcp 1.0.x, schemaVersion 1; workflow 1.0.0. Получай актуальные схемы из инструментов.
 
 ## Получить и принять
 

@@ -63,7 +63,7 @@ export class CodexExecutor implements Executor {
     this.process.on("error", () => this.fail("CODEX_PROCESS_ERROR"));
     this.process.on("exit", () => this.fail("CODEX_PROCESS_EXITED"));
     this.process.stdin.on("error", () => this.fail("CODEX_PROCESS_ERROR"));
-    this.ready = this.request("initialize", { clientInfo: { name: "task_dispatcher", version: "0.4.0", title: "Task dispatcher" } })
+    this.ready = this.request("initialize", { clientInfo: { name: "task_dispatcher", version: "1.0.0", title: "Task dispatcher" } })
       .then(() => { this.send({ method: "initialized" }); });
     // Callers may spend time inspecting the journal before awaiting readiness.
     void this.ready.catch(() => {});

@@ -1,6 +1,6 @@
 # Переиспользуемые роли и скиллы
 
-Workflow 1.0.0 совместим с сервером 0.3.x и schemaVersion 1. [Подробный план и матрица правил](workflow-implementation-plan.md). [Сценарии проверки решений](workflow-scenarios.md).
+Workflow 1.0.0 совместим с сервером 1.0.x и schemaVersion 1; ручной lifecycle сохраняет совместимость с 0.3.x/0.4.x. [Подробный план и матрица правил](workflow-implementation-plan.md). [Сценарии проверки решений](workflow-scenarios.md).
 
 ## Слои
 
@@ -9,7 +9,7 @@ Workflow 1.0.0 совместим с сервером 0.3.x и schemaVersion 1. 
 - `templates/project-binding.example.json`: projectId, рабочая папка, имена подключений и входные документы. Имена подключений — подсказки поиска, не доказательство роли или доступности.
 - Конфиги MCP: roots, allowlist, principal и role. Binding/skill не меняют их и не предоставляют права.
 
-## Lifecycle 0.3.x
+## Lifecycle API 1.0.x
 
 | Операция | Подключение / владелец | До → после |
 | --- | --- | --- |
