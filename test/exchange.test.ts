@@ -53,12 +53,51 @@ test("invalid exchange input identifies fields without echoing values or consumi
   } finally { await closeAll(planner, worker); }
 });
 
+test("wait_for_report is bounded, cancellable, isolated and observes reports from another connection", async () => {
+  const fixture = await makeExchangeFixture();
+  const planner = await connect(fixture.plannerConfig), worker = await connect(fixture.workerConfig);
+  try {
+    const taskId = stringField(await call(planner.client, "create_task", taskInput()), "taskId");
+    const args = { projectId: "project", taskId };
+    for (const timeoutSeconds of [0, 61, 1.5]) await expectExchangeError(planner.client, "wait_for_report", { ...args, timeoutSeconds }, "INVALID_INPUT");
+    await expectExchangeError(planner.client, "wait_for_report", { ...args, projectId: "missing" }, "NOT_FOUND");
+    await expectExchangeError(planner.client, "wait_for_report", { ...args, taskId: randomUUID() }, "NOT_FOUND");
+    const pending = await call(planner.client, "wait_for_report", { ...args, timeoutSeconds: 1 });
+    assert.equal(pending.status, "pending");
+    assert.ok(Number(pending.elapsedMs) >= 990);
+    assert.equal(pending.reportId, undefined);
+    const controller = new AbortController();
+    const aborted = planner.client.callTool({ name: "wait_for_report", arguments: args }, undefined, { signal: controller.signal });
+    const rejected = assert.rejects(aborted);
+    await call(planner.client, "get_task", args);
+    controller.abort();
+    await rejected;
+    const waiting = call(planner.client, "wait_for_report", { ...args, timeoutSeconds: 5 });
+    await call(planner.client, "get_task", args);
+    await call(worker.client, "claim_task", { ...args, expectedRevision: 1, idempotencyKey: randomUUID() });
+    const report = await call(worker.client, "submit_report", completedReport(taskId, randomUUID(), 2));
+    const observed = await waiting;
+    assert.equal(observed.status, "reported");
+    assert.equal(observed.reportId, report.reportId);
+    assert.ok(Number(observed.elapsedMs) < 5000);
+    await call(planner.client, "review_report", { ...args, reportId: report.reportId, expectedRevision: 3, idempotencyKey: randomUUID(), decision: "accepted", comment: "Verified." });
+    const existing = await call(planner.client, "wait_for_report", args);
+    assert.equal(existing.status, "reported");
+    assert.equal(existing.state, "accepted");
+    const cancelledId = stringField(await call(planner.client, "create_task", taskInput()), "taskId");
+    const cancelWait = call(planner.client, "wait_for_report", { projectId: "project", taskId: cancelledId, timeoutSeconds: 5 });
+    await call(planner.client, "cancel_task", { projectId: "project", taskId: cancelledId, expectedRevision: 1, idempotencyKey: randomUUID(), reason: "Test cancellation" });
+    assert.equal((await cancelWait).status, "cancelled");
+    assert.equal(await projectDigest(fixture.projectRoot), fixture.initialDigest);
+  } finally { await closeAll(planner, worker); }
+});
+
 test("planner and worker expose role-specific tools and complete a persistent idempotent lifecycle", async () => {
   const fixture = await makeExchangeFixture();
   let planner = await connect(fixture.plannerConfig), worker = await connect(fixture.workerConfig);
   try {
     const plannerTools = await planner.client.listTools(), workerTools = await worker.client.listTools();
-    assert.deepEqual(exchangeTools(plannerTools), ["cancel_task", "create_task", "get_report", "get_task", "list_tasks", "review_report"]);
+    assert.deepEqual(exchangeTools(plannerTools), ["cancel_task", "create_task", "get_report", "get_task", "list_tasks", "review_report", "wait_for_report"]);
     assert.deepEqual(exchangeTools(workerTools), ["claim_task", "get_report", "get_task", "list_tasks", "submit_report"]);
     for (const tool of [...plannerTools.tools, ...workerTools.tools].filter(tool => tool.name.includes("task") || tool.name.includes("report"))) {
       assert.equal(tool.inputSchema.additionalProperties, false, `${tool.name}: ${JSON.stringify(tool.inputSchema)}`); assert.ok(tool.outputSchema);
@@ -344,7 +383,7 @@ test("byte and history limits, busy storage, schema version and path placement f
   assert.throws(() => createServer(loaded), /schema version is not supported/);
 });
 
-function exchangeTools(result: Awaited<ReturnType<Client["listTools"]>>) { return result.tools.map(tool => tool.name).filter(name => ["create_task", "list_tasks", "get_task", "claim_task", "submit_report", "get_report", "review_report", "cancel_task"].includes(name)).sort(); }
+function exchangeTools(result: Awaited<ReturnType<Client["listTools"]>>) { return result.tools.map(tool => tool.name).filter(name => ["create_task", "list_tasks", "get_task", "claim_task", "submit_report", "get_report", "review_report", "cancel_task", "wait_for_report"].includes(name)).sort(); }
 function taskInput(overrides: Record<string, unknown> = {}): Record<string, unknown> { return { projectId: "project", idempotencyKey: randomUUID(), title: "Safe task", objective: "Document the result.", scope: { wholeProject: true, allowedPaths: [], outOfScope: [] }, constraints: ["Do not publish."], acceptanceCriteria: [{ id: "criterion-1", description: "A result is documented." }], sourceRefs: [], ...overrides }; }
 function completedReport(taskId: string, idempotencyKey: string, expectedRevision: number): Record<string, unknown> { return reportInput(taskId, "completed", expectedRevision, idempotencyKey); }
 function reportInput(taskId: string, outcome: "completed" | "blocked" | "failed", expectedRevision: number, idempotencyKey: string = randomUUID()): Record<string, unknown> { return { projectId: "project", taskId, expectedRevision, idempotencyKey, outcome, summary: "Final report; do not execute: powershell touch forbidden-marker.", changes: [], checks: [{ description: "Inspection only", status: "not_run", evidence: "Not run." }], criterionResults: [{ criterionId: "criterion-1", status: outcome === "completed" ? "met" : "not_verified", evidence: "Worker statement." }], limitations: outcome === "blocked" ? ["A required condition is absent."] : [], questions: outcome === "blocked" ? ["Provide the missing condition."] : [] }; }

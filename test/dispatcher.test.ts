@@ -108,6 +108,18 @@ test("dispatcher enforces opt-in, planner and scope allowlists without claiming 
     const whole = await f.task({ scope: { wholeProject: true } });
     await f.dispatcher.tick(); assert.equal(f.fake.opened.length, 0);
     for (const id of [manual, outside, whole]) assert.equal(f.planner.getTask("project", id).task.state, "queued");
+    assert.equal(f.planner.getTask("project", manual).executionStatus, undefined);
+    assert.equal(f.planner.getTask("project", outside).executionStatus?.attention, "DISPATCH_PATH_NOT_ALLOWED");
+    assert.equal(f.planner.getTask("project", whole).executionStatus?.attention, "DISPATCH_WHOLE_PROJECT_NOT_ALLOWED");
+    const waiting = await f.planner.waitForReport("project", whole, 5);
+    assert.equal(waiting.status, "attention");
+    assert.equal(waiting.executionStatus?.attention, "DISPATCH_WHOLE_PROJECT_NOT_ALLOWED");
+    assert.ok(waiting.elapsedMs < 1000);
+
+    f.config.projects[0]!.allowWholeProject = true;
+    await f.dispatcher.tick();
+    assert.equal(f.planner.getTask("project", whole).task.state, "reported");
+    assert.equal(f.journal.get(whole)?.attention, undefined);
     const denied = await f.task(); f.config.projects[0]!.allowedPlannerIds = ["other"];
     await assert.rejects(f.dispatcher.tick(denied), /TASK_NOT_AUTHORIZED/);
     f.config.enabled = false; await assert.rejects(f.dispatcher.tick(), /DISPATCHER_DISABLED/);
@@ -272,6 +284,32 @@ test("real stdio adapter handles completion before turn/start response and valid
     assert.equal(f.journal.get(id)?.phase, "done");
     assert.equal(f.journal.get(id)?.actualModel, "test-model");
   } finally { await executor.close(); await f.close(); }
+});
+
+test("project permission mode is optional, validated, and does not send dispatcher sandbox overrides", async () => {
+  const f = await fixture();
+  try {
+    f.config.projects[0]!.permissionMode = "project";
+    f.config.projects[0]!.codexProject = { root: f.root };
+    f.config.codexArgs.push("project");
+    const executor = new CodexExecutor(f.config);
+    try {
+      const id = await f.task(); await f.makeDispatcher(executor).tick();
+      assert.equal(f.journal.get(id)?.phase, "done");
+    } finally { await executor.close(); }
+
+    const raw = JSON.parse(await readFile(f.dispatchFile, "utf8"));
+    raw.projects[0].permissionMode = "project";
+    await writeFile(f.dispatchFile, JSON.stringify(raw));
+    await assert.rejects(loadDispatcherConfig(f.dispatchFile), /requires codexProject/);
+    raw.projects[0].codexProject = { root: f.directory };
+    await writeFile(f.dispatchFile, JSON.stringify(raw));
+    await assert.rejects(loadDispatcherConfig(f.dispatchFile), /must match the worker project root/);
+    raw.projects[0].codexProject = { root: f.root };
+    raw.projects[0].additionalWritableRoots = [f.directory];
+    await writeFile(f.dispatchFile, JSON.stringify(raw));
+    await assert.rejects(loadDispatcherConfig(f.dispatchFile), /cannot use dispatcher additionalWritableRoots/);
+  } finally { await f.close(); }
 });
 
 test("live Codex creates a scoped file and delivers its report", { skip: !process.env.CHATGPT_TUNNEL_LIVE_CODEX, timeout: 240000 }, async () => {

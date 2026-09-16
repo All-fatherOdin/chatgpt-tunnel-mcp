@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { setTimeout as delay } from "node:timers/promises";
 import type { AppConfig, ExchangeConfig } from "../config.js";
 import { ProjectError, readProjectFile } from "../projects.js";
 import type { CancelTaskInput, ClaimTaskInput, CreateTaskInput, ListTasksInput, Report, Review, ReviewReportInput, SubmitReportInput, Task } from "./schemas.js";
@@ -62,6 +63,33 @@ export class ExchangeService {
     const result = { report: this.store.getReport(projectId, reportId) };
     assertResponseBytes(result, this.exchange.limits.maxResponseBytes);
     return result;
+  }
+
+  async waitForReport(projectId: string, taskId: string, timeoutSeconds: number, signal?: AbortSignal) {
+    if (!Number.isInteger(timeoutSeconds) || timeoutSeconds < 1 || timeoutSeconds > 60) {
+      throw new ExchangeError("INVALID_INPUT", "timeoutSeconds must be an integer from 1 to 60.");
+    }
+    const start = performance.now();
+    const deadline = start + timeoutSeconds * 1000;
+    for (;;) {
+      signal?.throwIfAborted();
+      this.authorize(projectId, "planner");
+      // Read the authoritative exchange and the optional read-only dispatcher projection;
+      // no transaction is held while sleeping.
+      const { task, reportId } = this.store.getTask(projectId, taskId);
+      const executionStatus = readExecutionStatus(this.exchange.dispatcherStatePath, this.exchange.storePath, projectId, taskId);
+      const remaining = deadline - performance.now();
+      if (reportId || task.state === "cancelled" || executionStatus?.attention || remaining <= 0) {
+        const result = {
+          projectId, taskId, status: reportId ? "reported" as const : task.state === "cancelled" ? "cancelled" as const : executionStatus?.attention ? "attention" as const : "pending" as const,
+          state: task.state, ...(reportId ? { reportId } : {}), ...(executionStatus ? { executionStatus } : {}),
+          elapsedMs: Math.round((performance.now() - start) * 100) / 100
+        };
+        assertResponseBytes(result, this.exchange.limits.maxResponseBytes);
+        return result;
+      }
+      await delay(Math.min(1000, remaining), undefined, { signal });
+    }
   }
 
   claimTask(input: ClaimTaskInput) {

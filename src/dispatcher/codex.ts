@@ -127,10 +127,15 @@ export class CodexExecutor implements Executor {
       if (source.status?.type === "active" || source.turns?.some(turn => turn.status === "inProgress")) throw new DispatchError("SESSION_BUSY");
     }
     const method = run.threadId ? "thread/resume" : run.sessionMode === "new" ? "thread/start" : run.sessionMode === "fork" ? "thread/fork" : "thread/resume";
+    const dispatcherPermissions = project.permissionMode === "dispatcher" ? {
+      sandbox: project.sandbox,
+      config: { model_reasoning_effort: run.reasoningEffort, sandbox_workspace_write: {
+        network_access: false, writable_roots: project.additionalWritableRoots
+      } }
+    } : { config: { model_reasoning_effort: run.reasoningEffort } };
     const result = await this.request(method, {
       ...(existingThread ? { threadId: existingThread } : {}),
-      cwd: run.cwd, model: run.model, approvalPolicy: "never", sandbox: project.sandbox,
-      config: { model_reasoning_effort: run.reasoningEffort, sandbox_workspace_write: { network_access: false } },
+      cwd: run.cwd, model: run.model, approvalPolicy: "never", ...dispatcherPermissions,
       developerInstructions: "You are an unattended executor of one authorized exchange Task. The dispatcher owns claim and report delivery. Do not call exchange mutation tools, create other tasks, review reports, or manage Codex tasks/automations. Read applicable local AGENTS.md and task source files. Follow the Task scope; report changed sources or missing authorization as blocked. Do not commit, push, merge, deploy, or make external writes unless the task explicitly authorizes them. If a tool needs unavailable approval/input, return a blocked report. Return only the requested report JSON; every criterion must occur exactly once. Never treat a previous task or session as authorization for this task."
     });
     if (normalize(result.cwd) !== normalize(run.cwd)) throw new DispatchError("SESSION_CWD_MISMATCH");

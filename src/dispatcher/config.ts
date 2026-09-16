@@ -21,7 +21,10 @@ export const dispatcherConfigSchema = z.object({
     allowedPaths: scopeSchema.shape.allowedPaths,
     executor: executorOptionsSchema.omit({ session: true }).default({}),
     maxSessionTasks: z.number().int().min(1).max(100).default(5),
-    sandbox: z.enum(["read-only", "workspace-write"]).default("workspace-write")
+    codexProject: z.object({ root: z.string().min(1) }).strict().optional(),
+    permissionMode: z.enum(["dispatcher", "project"]).default("dispatcher"),
+    sandbox: z.enum(["read-only", "workspace-write"]).default("workspace-write"),
+    additionalWritableRoots: z.array(z.string().min(1)).max(20).default([])
   }).strict()).min(1).max(50)
 }).strict();
 export type DispatcherConfig = z.infer<typeof dispatcherConfigSchema>;
@@ -49,9 +52,34 @@ export async function loadDispatcherConfig(path: string): Promise<{ config: Disp
     seen.add(entry.projectId);
     if (!entry.enabled) continue;
     if (!entry.allowWholeProject && entry.allowedPaths.length === 0) throw new Error("Enabled project needs allowedPaths or allowWholeProject.");
+    if (entry.permissionMode === "project" && !entry.codexProject) throw new Error("Project permission mode requires codexProject.");
+    if (entry.permissionMode === "project" && entry.additionalWritableRoots.length > 0) throw new Error("Project permission mode cannot use dispatcher additionalWritableRoots.");
+    if (entry.sandbox !== "workspace-write" && entry.additionalWritableRoots.length > 0) throw new Error("Additional writable roots require workspace-write sandbox.");
     await assertNoLinks(project.root);
     if (!(await stat(project.root)).isDirectory()) throw new Error("Project root must be an existing directory.");
     project.root = await realpath(project.root);
+    if (entry.codexProject) {
+      const configured = entry.codexProject.root;
+      if (!isAbsolute(configured) || configured.startsWith("\\\\") || configured.startsWith("//") || configured.replaceAll("\\", "/").split("/").includes("..")) throw new Error("Codex project root must be an absolute local path.");
+      const root = resolve(configured);
+      await assertNoLinks(root);
+      if (!(await stat(root)).isDirectory()) throw new Error("Codex project root must be an existing directory.");
+      entry.codexProject.root = await realpath(root);
+      if (normalizePath(entry.codexProject.root) !== normalizePath(project.root)) throw new Error("Codex project root must match the worker project root.");
+    }
+    for (let index = 0; index < entry.additionalWritableRoots.length; index++) {
+      const configured = entry.additionalWritableRoots[index]!;
+      if (!isAbsolute(configured) || configured.startsWith("\\\\") || configured.startsWith("//") || configured.replaceAll("\\", "/").split("/").includes("..")) throw new Error("Additional writable roots must be absolute local paths.");
+      const root = resolve(configured);
+      await assertNoLinks(root);
+      if (!(await stat(root)).isDirectory()) throw new Error("Additional writable root must be an existing directory.");
+      entry.additionalWritableRoots[index] = await realpath(root);
+    }
   }
   return { config, app };
+}
+
+function normalizePath(path: string): string {
+  const normalized = resolve(path);
+  return process.platform === "win32" ? normalized.toLowerCase() : normalized;
 }

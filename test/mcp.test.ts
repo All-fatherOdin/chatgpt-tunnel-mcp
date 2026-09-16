@@ -91,6 +91,35 @@ test("literal search and path defenses apply consistently", async t => {
   } finally { await session.transport.close(); }
 });
 
+test("opt-in wait_probe echoes marker after delay, permits concurrent ping and validates bounds", async () => {
+  const fixture = await makeFixture(false);
+  const config = JSON.parse(await readFile(fixture.config, "utf8"));
+  config.waitProbeEnabled = true;
+  await writeFile(fixture.config, JSON.stringify(config), "utf8");
+  const session = await connect(fixture.config);
+  try {
+    assert.ok((await session.client.listTools()).tools.some(tool => tool.name === "wait_probe"));
+    for (const durationSeconds of [0, 601, 1.5]) {
+      await expectError(session.client, "wait_probe", { durationSeconds, marker: "bounds" }, /validation|invalid/i);
+    }
+    await expectError(session.client, "wait_probe", { durationSeconds: 1, marker: "bad\nmarker" }, /validation|invalid/i);
+    let finished = false;
+    const wait = call(session.client, "wait_probe", { durationSeconds: 1, marker: "4B-test-7319" }).then(result => { finished = true; return result; });
+    assert.equal(field(await call(session.client, "ping", {}), "deviceId"), "device-test-opaque");
+    assert.equal(finished, false, "waiting must not block other MCP requests");
+    const result = await wait;
+    assert.equal(result.marker, "4B-test-7319");
+    assert.equal(result.requestedSeconds, 1);
+    assert.ok(Number(result.elapsedMs) >= 990);
+    assert.ok(Date.parse(String(result.completedAt)) >= Date.parse(String(result.startedAt)));
+    const controller = new AbortController();
+    const cancelled = session.client.callTool({ name: "wait_probe", arguments: { durationSeconds: 600, marker: "cancel" } }, undefined, { signal: controller.signal });
+    controller.abort();
+    await assert.rejects(cancelled);
+    assert.equal(field(await call(session.client, "ping", {}), "deviceId"), "device-test-opaque");
+  } finally { await session.transport.close(); }
+});
+
 async function makeFixture(withProjects: boolean) {
   const directory = await mkdtemp(join(tmpdir(), "chatgpt-tunnel-mcp-")); temporaryDirectories.push(directory);
   const probe = join(directory, "probe.txt"), config = join(directory, "config.json"), one = join(directory, "project one"), two = join(directory, "project two");

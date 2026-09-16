@@ -14,6 +14,8 @@
     "allowedPaths": ["docs"],
     "executor": {},
     "maxSessionTasks": 5,
-    "sandbox": "workspace-write"
+    "permissionMode": "dispatcher",
+    "sandbox": "workspace-write",
+    "additionalWritableRoots": []
   }]
 }

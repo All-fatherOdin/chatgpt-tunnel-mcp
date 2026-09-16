@@ -2,6 +2,7 @@ import { createInterface } from 'node:readline';
 const send = value => process.stdout.write(JSON.stringify(value) + '\n');
 const report = { outcome: 'completed', summary: 'Protocol fixture', changes: [], checks: [], criterionResults: [{ criterionId: 'AC1', status: 'met', evidence: 'Fixture' }], limitations: [], questions: [] };
 let cwd;
+const expectedPermissionMode = process.argv[2];
 for await (const line of createInterface({ input: process.stdin })) {
   const message = JSON.parse(line);
   if (message.id === undefined) continue;
@@ -10,7 +11,10 @@ for await (const line of createInterface({ input: process.stdin })) {
   switch (message.method) {
     case 'initialize': result = { userAgent: 'fixture' }; break;
     case 'model/list': result = { data: [{ model: 'test-model', defaultReasoningEffort: 'medium', supportedReasoningEfforts: [{ reasoningEffort: 'medium' }] }], nextCursor: null }; break;
-    case 'thread/start': cwd = p.cwd; result = { thread: { id: 'fixture-thread' }, cwd, model: p.model, reasoningEffort: 'medium' }; break;
+    case 'thread/start':
+      if (expectedPermissionMode === 'project' && ('sandbox' in p || 'sandbox_workspace_write' in (p.config ?? {}))) throw new Error('Project permissions were overridden');
+      if (expectedPermissionMode === 'dispatcher' && (p.sandbox !== 'workspace-write' || !('sandbox_workspace_write' in (p.config ?? {})))) throw new Error('Dispatcher permissions are missing');
+      cwd = p.cwd; result = { thread: { id: 'fixture-thread' }, cwd, model: p.model, reasoningEffort: 'medium' }; break;
     case 'turn/start':
       if (!p.outputSchema || p.model !== 'test-model' || !p.input[0].text.startsWith('Dispatcher run ')) throw new Error('Invalid protocol request');
       if (JSON.stringify(p.outputSchema).includes('(?!')) throw new Error('Structured Outputs cannot use lookaround');

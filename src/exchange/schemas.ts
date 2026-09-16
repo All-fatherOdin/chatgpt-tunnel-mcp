@@ -56,6 +56,11 @@ export const listTasksInputSchema = z.object({
   limit: z.number().int().positive().max(100).optional()
 }).strict();
 export const getTaskInputSchema = z.object({ projectId: z.string().min(1).max(100), taskId: id }).strict();
+export const waitForReportInputSchema = getTaskInputSchema.extend({ timeoutSeconds: z.number().int().min(1).max(60).default(60) }).strict();
+export const waitForReportOutputSchema = z.object({
+  projectId: z.string(), taskId: id, status: z.enum(["pending", "reported", "cancelled", "attention"]),
+  state: z.enum(taskStates), reportId: id.optional(), executionStatus: z.lazy(() => executionStatusSchema).optional(), elapsedMs: z.number().nonnegative()
+}).strict();
 const mutationBase = { projectId: z.string().min(1).max(100), taskId: id, expectedRevision: z.number().int().positive(), idempotencyKey: id };
 export const claimTaskInputSchema = z.object(mutationBase).strict();
 

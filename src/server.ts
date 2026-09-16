@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { setTimeout as delay } from "node:timers/promises";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import type { AppConfig } from "./config.js";
@@ -34,6 +35,25 @@ export function createServer(config: AppConfig): McpServer {
     inputSchema: z.object({ projectId, query: z.string().min(1).max(1_000), path: relativePath.optional().default(""), limit: z.number().int().positive().max(2_000).optional(), snippetChars: z.number().int().positive().max(2_000).optional() }).strict()
   }, async input => instrument("search_text", () => searchProjectText(config, input)));
   registerExchangeTools(server, config, instrument);
+  if (config.waitProbeEnabled) {
+    server.registerTool("wait_probe", {
+      title: "Test delayed MCP response",
+      description: "Diagnostic only: wait 1–600 seconds without a model call, then echo a non-secret marker and server timing. No progress events. Tests an outstanding request, not wake-up of a finished conversation. Client or tunnel timeouts may end the request earlier. Do not retry automatically.",
+      annotations,
+      inputSchema: z.object({
+        durationSeconds: z.number().int().min(1).max(600),
+        marker: z.string().min(1).max(128).regex(/^[A-Za-z0-9._-]+$/).describe("Unique non-secret test marker")
+      }).strict(),
+      outputSchema: z.object({
+        marker: z.string(), requestedSeconds: z.number().int(), elapsedMs: z.number().nonnegative(),
+        startedAt: z.string().datetime(), completedAt: z.string().datetime()
+      }).strict()
+    }, async ({ durationSeconds, marker }, extra) => instrument("wait_probe", async () => {
+      const startedAt = new Date().toISOString(), start = performance.now();
+      await delay(durationSeconds * 1000, undefined, { signal: extra.signal });
+      return { marker, requestedSeconds: durationSeconds, elapsedMs: roundedDuration(start), startedAt, completedAt: new Date().toISOString() };
+    }));
+  }
   return server;
 }
 

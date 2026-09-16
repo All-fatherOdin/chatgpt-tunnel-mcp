@@ -50,6 +50,7 @@ const configSchema = z.object({
   deviceId: z.string().min(8).max(128).regex(/^[A-Za-z0-9][A-Za-z0-9._-]*$/, "must be an opaque, non-secret identifier"),
   probeFile: z.string().min(1),
   maxProbeBytes: z.number().int().positive().max(1_048_576).default(65_536),
+  waitProbeEnabled: z.boolean().optional(),
   projects: z.array(projectSchema).max(50).optional(),
   exchange: z.union([disabledExchangeSchema, enabledExchangeSchema]).optional()
 }).strict();
@@ -58,7 +59,7 @@ export type ProjectLimits = z.infer<typeof limitsSchema>;
 export type ProjectConfig = Omit<z.infer<typeof projectSchema>, "root"> & { root: string };
 export type ExchangeLimits = z.infer<typeof exchangeLimitsSchema>;
 export type ExchangeConfig = Omit<z.infer<typeof enabledExchangeSchema>, "storePath"> & { storePath: string };
-export type AppConfig = { deviceId: string; probeFile: string; maxProbeBytes: number; projects: ProjectConfig[]; exchange?: ExchangeConfig | undefined };
+export type AppConfig = { deviceId: string; probeFile: string; maxProbeBytes: number; waitProbeEnabled?: boolean; projects: ProjectConfig[]; exchange?: ExchangeConfig | undefined };
 
 export async function loadConfig(configPath: string): Promise<AppConfig> {
   const absoluteConfigPath = resolve(configPath);
@@ -104,6 +105,7 @@ export async function loadConfig(configPath: string): Promise<AppConfig> {
     deviceId: result.data.deviceId,
     probeFile: isAbsolute(result.data.probeFile) ? resolve(result.data.probeFile) : resolve(dirname(absoluteConfigPath), result.data.probeFile),
     maxProbeBytes: result.data.maxProbeBytes,
+    waitProbeEnabled: result.data.waitProbeEnabled ?? false,
     projects,
     ...(exchange ? { exchange } : {})
   };

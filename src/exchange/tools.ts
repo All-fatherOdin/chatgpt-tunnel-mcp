@@ -4,7 +4,8 @@ import type { AppConfig } from "../config.js";
 import {
   cancelTaskInputSchema, cancelTaskOutputSchema, claimTaskInputSchema, claimTaskOutputSchema, createTaskInputSchema, createTaskOutputSchema,
   getReportInputSchema, getReportOutputSchema, getTaskInputSchema, getTaskOutputSchema, listTasksInputSchema, listTasksOutputSchema,
-  reviewReportInputSchema, reviewReportOutputSchema, submitReportInputSchema, submitReportOutputSchema
+  reviewReportInputSchema, reviewReportOutputSchema, submitReportInputSchema, submitReportOutputSchema,
+  waitForReportInputSchema, waitForReportOutputSchema
 } from "./schemas.js";
 import { ExchangeService } from "./service.js";
 import { ExchangeError } from "./store.js";
@@ -28,6 +29,14 @@ export function registerExchangeTools(server: McpServer, config: AppConfig, run:
   }, input => run("get_report", () => { const value = validated(getReportInputSchema, input); return service.getReport(value.projectId, value.reportId); }) as never);
 
   if (config.exchange.role === "planner") {
+    server.registerTool("wait_for_report", {
+      title: "Wait for exchange report",
+      description: "Wait up to 60 seconds for an existing task's report. Returns reported with reportId, pending on deadline, cancelled, or attention with dispatcher diagnostics. Does not launch work, review reports, or wake a finished conversation. A caller may repeat pending waits within an explicit budget; stop on attention, errors and cancellation.",
+      inputSchema: deferredValidation(waitForReportInputSchema), outputSchema: waitForReportOutputSchema, annotations: readAnnotations
+    }, (input, extra) => run("wait_for_report", () => {
+      const value = validated(waitForReportInputSchema, input);
+      return service.waitForReport(value.projectId, value.taskId, value.timeoutSeconds, extra.signal);
+    }) as never);
     server.registerTool("create_task", {
       title: "Create exchange task", description: "Publish a structured task. execution.autoStart=true explicitly authorizes a separately configured local dispatcher to execute its scope; optional model/reasoningEffort/session override launch defaults. Without opt-in it stays manual. This MCP server never launches processes or modifies project files.", inputSchema: deferredValidation(createTaskInputSchema), outputSchema: createTaskOutputSchema, annotations: mutationAnnotations
     }, input => run("create_task", () => service.createTask(validated(createTaskInputSchema, input))) as never);

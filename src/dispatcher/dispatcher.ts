@@ -32,6 +32,17 @@ export class Dispatcher {
         if (hasOverrides) throw new DispatchError("RUN_SETTINGS_ALREADY_FROZEN");
         continue;
       }
+      if (run.attention && AUTOSTART_POLICY_ATTENTION.has(run.attention) && !hasOverrides) {
+        const task = this.exchange.getTask(run.projectId, run.taskId).task;
+        const project = this.config.projects.find(item => item.projectId === run.projectId);
+        const currentAttention = project ? authorizationAttention(task, project) : "DISPATCH_PROJECT_NOT_CONFIGURED";
+        if (currentAttention) {
+          if (currentAttention !== run.attention) { run.attention = currentAttention; this.save(run); }
+          continue;
+        }
+        delete run.attention;
+        this.save(run);
+      }
       if (run.attention && !recover && !hasOverrides) continue;
       if (hasOverrides) {
         const task = this.exchange.getTask(run.projectId, run.taskId).task;
@@ -47,7 +58,7 @@ export class Dispatcher {
       if (recover) delete run.attention;
       await this.advance(run);
     }
-    for (const project of this.config.projects.filter(value => value.enabled)) {
+    for (const project of this.config.projects) {
       let cursor: string | undefined;
       do {
         const page = this.exchange.listTasks({ projectId: project.projectId, states: ["queued"], ...(cursor ? { cursor } : {}) });
@@ -62,10 +73,16 @@ export class Dispatcher {
             continue;
           }
           const task = this.exchange.getTask(project.projectId, taskId).task;
-          if (!authorized(task, project)) {
+          const attention = authorizationAttention(task, project);
+          if (attention) {
             if (onlyTaskId) throw new DispatchError("TASK_NOT_AUTHORIZED_FOR_AUTOSTART");
+            const run = await this.prepare(task, project, overrides);
+            run.attention = attention;
+            this.save(run);
             continue;
           }
+          // A queued task without explicit autoStart is intentionally manual, not an error.
+          if (task.execution?.autoStart !== true) continue;
           const run = await this.prepare(task, project, overrides);
           this.journal.save(run);
           await this.advance(run);
@@ -251,9 +268,20 @@ export class Dispatcher {
 }
 
 export function authorized(task: Task, project: DispatchProject): boolean {
-  if (!project.enabled || task.execution?.autoStart !== true || !project.allowedPlannerIds.includes(task.createdBy)) return false;
-  if (task.scope.wholeProject) return project.allowWholeProject;
-  return task.scope.allowedPaths.length > 0 && (project.allowWholeProject || task.scope.allowedPaths.every(path => project.allowedPaths.some(parent => within(path, parent))));
+  return task.execution?.autoStart === true && authorizationAttention(task, project) === undefined;
+}
+const AUTOSTART_POLICY_ATTENTION = new Set([
+  "DISPATCH_PROJECT_DISABLED", "DISPATCH_PLANNER_NOT_ALLOWED", "DISPATCH_WHOLE_PROJECT_NOT_ALLOWED",
+  "DISPATCH_SCOPE_EMPTY", "DISPATCH_PATH_NOT_ALLOWED", "DISPATCH_PROJECT_NOT_CONFIGURED"
+]);
+export function authorizationAttention(task: Task, project: DispatchProject): string | undefined {
+  if (task.execution?.autoStart !== true) return undefined;
+  if (!project.enabled) return "DISPATCH_PROJECT_DISABLED";
+  if (!project.allowedPlannerIds.includes(task.createdBy)) return "DISPATCH_PLANNER_NOT_ALLOWED";
+  if (task.scope.wholeProject) return project.allowWholeProject ? undefined : "DISPATCH_WHOLE_PROJECT_NOT_ALLOWED";
+  if (task.scope.allowedPaths.length === 0) return "DISPATCH_SCOPE_EMPTY";
+  if (!project.allowWholeProject && !task.scope.allowedPaths.every(path => project.allowedPaths.some(parent => within(path, parent)))) return "DISPATCH_PATH_NOT_ALLOWED";
+  return undefined;
 }
 function within(path: string, parent: string): boolean {
   const norm = (value: string) => {
