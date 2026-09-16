@@ -15,6 +15,6 @@ The server polls the exchange and, when configured, the read-only dispatcher pro
 
 Suggested ChatGPT test instruction, after choosing a real task:
 
-> Call wait_for_report for the specified projectId and taskId with timeoutSeconds=60. On pending, repeat without asking me, up to 10 calls total. On reported, fetch get_report and summarize it; do not accept it or create follow-up tasks automatically. On attention, cancelled, any error, or after 10 pending responses, stop and report the reason. Do not retry errors automatically.
+> Call wait_for_report for the specified projectId and taskId with timeoutSeconds=60. On pending, repeat without asking me, up to 60 calls total. On reported, fetch get_report and summarize it; do not accept it or create follow-up tasks automatically. On attention, cancelled, any error, or after 60 pending responses, stop and report the reason. Do not retry errors automatically.
 
-The 10-call budget belongs to the caller, not the server. Tool-call continuation and tunnel timeouts must still be verified in ChatGPT; local tests alone do not establish autonomous wake-up or quota savings.
+The 60-call budget belongs to the caller, not the server, and targets roughly one hour of best-effort waiting. Tool-call continuation and tunnel timeouts must still be verified in ChatGPT; local tests alone do not establish that one turn will remain active for the full hour, autonomous wake-up, or quota savings. Task execution and persisted reports do not depend on the caller completing all 60 waits.

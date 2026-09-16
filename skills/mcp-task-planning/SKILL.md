@@ -27,4 +27,6 @@ description: Prepare or publish a scoped task through the task-exchange MCP plan
 
 При timeout/Session terminated сначала восстанови доступ и прочитай состояние/список. Если нужен повтор — только тот же запрос с тем же ключом; смена ключа создаёт риск дубля. Если исходные аргументы потеряны, не угадывай. INVALID_INPUT исправляй по схеме; при неопределённости commit не меняй payload. IDEMPOTENCY_CONFLICT требует сверки receipt, NOT_FOUND может означать allowlist или другую базу. Не редактируй SQLite и не меняй роли ради обхода ошибки.
 
-Итог: для draft покажи предложение и открытые вопросы; для публикации — projectId, taskId, state/revision и следующую роль. Не утверждай, что публикация запустила исполнителя.
+Для autoStart-задачи после публикации вызови wait_for_report с timeoutSeconds=60. При pending повторяй без запроса к пользователю, максимум 60 вызовов суммарно. При reported прочитай Report; при attention, cancelled, любой ошибке или после 60 pending остановись и сообщи состояние. Ошибки автоматически не повторяй. Это best-effort ожидание вызывающего агента: завершение его хода не отменяет Task и не удаляет сохранённый Report.
+
+Итог: для draft покажи предложение и открытые вопросы; для публикации — projectId, taskId, state/revision и следующую роль. Не утверждай запуск без autoStart и подтверждающего executionStatus или Report.
