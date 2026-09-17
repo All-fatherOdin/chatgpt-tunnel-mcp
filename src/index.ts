@@ -1,4 +1,4 @@
-import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import { BoundedStdioTransport } from "./bounded-transport.js";
 import { loadConfig, errorMessage } from "./config.js";
 import { createServer, SERVER_NAME, SERVER_VERSION } from "./server.js";
 
@@ -15,7 +15,7 @@ function configArgument(argv: string[]): string {
 try {
   const config = await loadConfig(configArgument(process.argv.slice(2)));
   const server = createServer(config);
-  await server.connect(new StdioServerTransport());
+  await server.connect(new BoundedStdioTransport(config));
   process.stderr.write(`${SERVER_NAME} ${SERVER_VERSION} listening on stdio\n`);
 } catch (error) {
   process.stderr.write(`Startup failed: ${errorMessage(error)}\n`);

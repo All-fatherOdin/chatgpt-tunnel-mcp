@@ -4,8 +4,8 @@ import { z } from "zod";
 import { MAX_REPORT_BYTES, MAX_RESPONSE_BYTES, MAX_REVIEW_BYTES, MAX_TASK_BYTES, MIN_CONFIGURED_TASK_BYTES, MIN_EXCHANGE_RESPONSE_BYTES } from "./exchange/limits.js";
 
 const limitsSchema = z.object({
-  maxFileBytes: z.number().int().positive().max(4_194_304).default(1_048_576),
-  maxResponseBytes: z.number().int().positive().max(1_048_576).default(131_072),
+  maxFileBytes: z.number().int().positive().max(1_073_741_824).default(1_048_576),
+  maxResponseBytes: z.number().int().min(4_096).max(1_048_576).default(131_072),
   maxResults: z.number().int().positive().max(2_000).default(200),
   maxDepth: z.number().int().min(0).max(20).default(8),
   searchTimeoutMs: z.number().int().positive().max(30_000).default(5_000),

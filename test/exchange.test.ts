@@ -202,6 +202,8 @@ test("semantic validation covers scope, sources, criteria and blocked reports", 
     await expectExchangeError(planner.client, "create_task", taskInput({ acceptanceCriteria: [{ id: "same", description: "one" }, { id: "same", description: "two" }] }), "INVALID_INPUT");
     await expectExchangeError(planner.client, "create_task", taskInput({ sourceRefs: [{ path: "README.md", sha256: "0".repeat(64), startLine: 2 }] }), "INVALID_INPUT");
     await expectExchangeError(planner.client, "create_task", taskInput({ sourceRefs: [{ path: ".env", sha256: "0".repeat(64) }] }), "INVALID_INPUT");
+    await writeFile(join(fixture.projectRoot, "invalid.txt"), Buffer.from([0xff]));
+    await expectExchangeError(planner.client, "create_task", taskInput({ sourceRefs: [{ path: "invalid.txt", sha256: "0".repeat(64) }] }), "INVALID_INPUT");
     const taskId = stringField(await call(planner.client, "create_task", taskInput()), "taskId");
     await call(worker.client, "claim_task", { projectId: "project", taskId, expectedRevision: 1, idempotencyKey: randomUUID() });
     await expectExchangeError(worker.client, "submit_report", { ...reportInput(taskId, "completed", 2), criterionResults: [] }, "INVALID_INPUT");

@@ -2,6 +2,8 @@ import { randomUUID } from "node:crypto";
 import { setTimeout as delay } from "node:timers/promises";
 import type { AppConfig, ExchangeConfig } from "../config.js";
 import { ProjectError, readProjectFile } from "../projects.js";
+import { ReadProtocolError } from "../read-protocol.js";
+import { TextReadError } from "../text-index.js";
 import type { CancelTaskInput, ClaimTaskInput, CreateTaskInput, ListTasksInput, Report, Review, ReviewReportInput, SubmitReportInput, Task } from "./schemas.js";
 import { ExchangeError, ExchangeStore } from "./store.js";
 import { MAX_CANCEL_REASON_JSON_BYTES, cancelReasonJsonBytes, jsonBytes, taskLifecycleBytes } from "./limits.js";
@@ -29,7 +31,7 @@ export class ExchangeService {
       if ((source.startLine === undefined) !== (source.endLine === undefined) || (source.startLine !== undefined && source.endLine! < source.startLine)) throw new ExchangeError("INVALID_INPUT", "Source reference line ranges are invalid.");
       try { await readProjectFile(this.appConfig, { projectId: input.projectId, path: source.path, ...(source.startLine ? { startLine: source.startLine, endLine: source.endLine } : {}) }); }
       catch (error) {
-        if (error instanceof ProjectError) throw new ExchangeError("INVALID_INPUT", "A source reference is not readable under project policy.");
+        if (error instanceof ProjectError || error instanceof TextReadError || error instanceof ReadProtocolError) throw new ExchangeError("INVALID_INPUT", "A source reference is not readable under project policy.");
         throw error;
       }
     }

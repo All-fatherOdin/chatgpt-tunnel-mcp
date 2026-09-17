@@ -120,6 +120,33 @@ test("opt-in wait_probe echoes marker after delay, permits concurrent ping and v
   } finally { await session.transport.close(); }
 });
 
+test("MCP continuation is executable, errors include exact recovery and restart invalidates cursors", async () => {
+  const fixture = await makeFixture(true);
+  const session = await connect(fixture.config);
+  let continuation: { next_tool: string; next_arguments: Record<string, unknown> };
+  try {
+    const first = await call(session.client, "read_file", { projectId: "one", path: "many.txt" });
+    continuation = first.continuation as typeof continuation;
+    assert.ok(continuation);
+    const raw = await session.client.callTool({ name: continuation.next_tool, arguments: continuation.next_arguments });
+    assert.equal(raw.isError, undefined);
+    assert.ok(Buffer.byteLength(JSON.stringify({ jsonrpc: "2.0", id: 100, result: raw })) + 1 <= 8192);
+    await writeFile(join(fixture.one, "many.txt"), "changed\n");
+    const stale = await session.client.callTool({ name: continuation.next_tool, arguments: continuation.next_arguments });
+    assert.equal(stale.isError, true);
+    const error = JSON.parse((stale.content as Array<{ text: string }>)[0]!.text);
+    assert.equal(error.code, "CURSOR_STALE");
+    assert.equal(error.do_not_retry_same_arguments, true);
+    assert.equal(error.recovery.next_tool, "read_file");
+    assert.deepEqual(error.recovery.next_arguments, { projectId: "one", path: "many.txt" });
+    assert.equal((await call(session.client, error.recovery.next_tool, error.recovery.next_arguments)).content, "changed");
+  } finally { await session.transport.close(); }
+  const restarted = await connect(fixture.config);
+  try {
+    await expectError(restarted.client, continuation!.next_tool, continuation!.next_arguments, /CURSOR_INVALID/);
+  } finally { await restarted.transport.close(); }
+});
+
 async function makeFixture(withProjects: boolean) {
   const directory = await mkdtemp(join(tmpdir(), "chatgpt-tunnel-mcp-")); temporaryDirectories.push(directory);
   const probe = join(directory, "probe.txt"), config = join(directory, "config.json"), one = join(directory, "project one"), two = join(directory, "project two");
@@ -132,7 +159,7 @@ async function makeFixture(withProjects: boolean) {
     await writeFile(join(one, "empty.txt"), "", "utf8"); await writeFile(join(one, ".env"), "TOP-SECRET", "utf8"); await writeFile(join(one, "private", "hidden.txt"), "TOP-SECRET", "utf8");
     await writeFile(join(one, "raw.dat"), Buffer.from([0, 1, 2])); await writeFile(join(one, "bad.txt"), Buffer.from([0xff, 0xfe])); await writeFile(join(one, "huge.txt"), "x".repeat(1001), "utf8"); await writeFile(join(one, "many.txt"), Array.from({ length: 40 }, (_, i) => `line ${i}`).join("\n"), "utf8");
     await writeFile(join(two, "README.md"), "second root\n", "utf8");
-    const limits = { maxFileBytes: 1000, maxResponseBytes: 120, maxResults: 10, maxDepth: 3, searchTimeoutMs: 5000, maxSnippetChars: 100 };
+    const limits = { maxFileBytes: 1000, maxResponseBytes: 8192, maxResults: 10, maxDepth: 3, searchTimeoutMs: 5000, maxSnippetChars: 100 };
     data.projects = [
       { projectId: "one", name: "One", description: "first", root: one, readOnly: true, excludePaths: ["private"], entryDocuments: [{ label: "README", path: "README.md" }], limits },
       { projectId: "two", name: "Two", description: "second", root: two, readOnly: true, excludePaths: [], entryDocuments: [], limits }

@@ -89,6 +89,13 @@ npm.cmd run dispatcher -- --config config/dispatcher.local.json
 
 `wait_for_report` ждёт от 1 до 60 секунд и возвращает `pending`, `reported`, `cancelled` или `attention`. Он не запускает модель и не меняет lifecycle. `wait_probe` проверяет только задержанный MCP-ответ и не нужен в обычной работе.
 
+`read_file`, `list_files`, `search_text` используют [project-read/2](docs/project-read-protocol.md):
+ограниченные страницы, точное `continuation`, привязку к поколению источника и
+накопительный `coverage`. Продолжение нужно выполнять дословно; `nextStartLine`
+не заменяет cursor при разделённой строке. Неполное покрытие нельзя выдавать за
+полное чтение. Для больших логов увеличьте `maxFileBytes` явно; старые настройки
+`maxResponseBytes < 4096` требуют обновления.
+
 ## Подключение клиентов
 
 ChatGPT должен использовать planner-профиль через Secure MCP Tunnel. Настройка tunnel и независимого Windows launcher: [docs/windows-launcher.md](docs/windows-launcher.md).
