@@ -7,6 +7,7 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { bindingSchema, renderInstructions, installSkill, repository, workflow } from '../scripts/workflow-lib.mjs';
 import { createTaskInputSchema, claimTaskInputSchema, submitReportInputSchema, reviewReportInputSchema } from '../dist/src/exchange/schemas.js';
+import { SERVER_VERSION } from '../dist/src/server.js';
 
 const example = JSON.parse(await readFile(join(repository, 'templates/project-binding.example.json'), 'utf8'));
 test('binding rejects ambiguous project identities and unsafe source paths', () => {
@@ -77,5 +78,10 @@ test('workflow example requests remain valid against actual MCP schemas', async 
   const requests = JSON.parse(await readFile(join(repository, 'templates/exchange-requests.example.json'), 'utf8'));
   for (const [name, schema] of Object.entries({ create_task: createTaskInputSchema, claim_task: claimTaskInputSchema, submit_report: submitReportInputSchema, review_report: reviewReportInputSchema })) schema.parse(requests[name]);
   const pkg = JSON.parse(await readFile(join(repository, 'package.json'), 'utf8'));
-  assert.match(pkg.version, /^1\.0\./);
+  const lock = JSON.parse(await readFile(join(repository, 'package-lock.json'), 'utf8'));
+  assert.match(pkg.version, /^2\.0\./);
+  assert.equal(SERVER_VERSION, pkg.version);
+  assert.equal(lock.version, pkg.version);
+  assert.equal(lock.packages[''].version, pkg.version);
+  assert.equal(workflow.version, pkg.version);
 });

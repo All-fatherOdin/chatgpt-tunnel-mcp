@@ -5,7 +5,7 @@ description: Prepare or publish a scoped task through the task-exchange MCP plan
 
 # Подготовка и передача MCP-задания
 
-Совместимость: chatgpt-tunnel-mcp 1.0.x, schemaVersion 1; workflow 1.0.0. Схемы аргументов получай из живых инструментов, не придумывай reopen или межпроектные sourceRefs.
+Совместимость: chatgpt-tunnel-mcp 2.0.x, project-read/2, schemaVersion 1; workflow 2.0.0. Схемы аргументов получай из живых инструментов, не придумывай reopen или межпроектные sourceRefs.
 
 ## Подготовка
 

@@ -1,6 +1,10 @@
 {
-  "version": "1.0.0",
-  "serverCompatibility": "1.0.x, schemaVersion 1; manual lifecycle remains compatible with 0.3.x/0.4.x",
+  "version": "2.0.0",
+  "serverCompatibility": "2.0.x, project-read/2, schemaVersion 1; Task/Report/Review data remains compatible with 1.0.x",
   "schemaVersion": 1,
-  "skills": ["mcp-task-planning", "mcp-task-execution", "mcp-report-review"]
+  "skills": [
+    "mcp-task-planning",
+    "mcp-task-execution",
+    "mcp-report-review"
+  ]
 }

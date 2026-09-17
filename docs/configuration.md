@@ -1,4 +1,4 @@
-# Конфигурация chatgpt-tunnel-mcp 1.0
+# Конфигурация chatgpt-tunnel-mcp 2.0
 
 Конфиги являются строгими JSON-объектами: неизвестное поле вызывает ошибку запуска. Рабочие файлы `*.local.json` исключены из Git; переносимые примеры находятся в `config/`.
 
@@ -139,4 +139,4 @@ Binding и skills не регистрируют MCP-проекты и не вы�
 
 ## Хранилище и совместимость
 
-SQLite использует WAL, foreign keys, короткие `BEGIN IMMEDIATE`, revision и сохранённые результаты идемпотентности. SchemaVersion 1 не требует миграции при переходе с 0.4.0 на 1.0.0. Backup, старые Task без lifecycle reserve и полный state contract описаны в [stage-3-task-report-exchange.md](stage-3-task-report-exchange.md).
+SQLite использует WAL, foreign keys, короткие `BEGIN IMMEDIATE`, revision и сохранённые результаты идемпотентности. SchemaVersion 1 сохраняется в 2.0.0: при переходе с 1.0.x миграция SQLite не требуется. Изменения совместимости касаются чтения и минимального бюджета ответа. Backup, старые Task без lifecycle reserve и полный state contract описаны в [stage-3-task-report-exchange.md](stage-3-task-report-exchange.md).

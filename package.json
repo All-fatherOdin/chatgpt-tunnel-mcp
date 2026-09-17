@@ -1,6 +1,6 @@
 {
   "name": "chatgpt-tunnel-mcp",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "private": true,
   "type": "module",
   "description": "Local MCP bridge for project reading and automated ChatGPT-to-Codex task exchange",

@@ -12,7 +12,7 @@ import { READ_INSTRUCTIONS, ReadProtocolError, toolResult } from "./read-protoco
 import { TextReadError } from "./text-index.js";
 
 export const SERVER_NAME = "chatgpt-tunnel-mcp";
-export const SERVER_VERSION = "1.0.0";
+export const SERVER_VERSION = "2.0.0";
 const annotations = { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false } as const;
 const emptyInput = z.object({}).strict();
 const projectId = z.string().min(1).max(100);
